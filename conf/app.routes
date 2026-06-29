@@ -1,0 +1,10 @@
+# microservice app routes
+
+GET     /person/:nino                             uk.gov.hmrc.hods.controllers.NpsController.getPerson(nino: Nino)
+POST    /person/:nino/print-suppression           uk.gov.hmrc.hods.controllers.NpsController.updatePrintSuppression(nino: Nino)
+POST    /notify-subscriber                        uk.gov.hmrc.hods.controllers.NpsController.notifySubscriber()
+
+PUT     /alert                                    uk.gov.hmrc.hods.controllers.AlertController.putAlert
+POST    /alert                                    uk.gov.hmrc.hods.controllers.AlertController.putAlert
+POST    /alert/print-suppression/:id/status       uk.gov.hmrc.hods.controllers.AlertController.changeStatus(id: org.mongodb.scala.bson.ObjectId)
+GET     /alert/print-suppression/:id/status       uk.gov.hmrc.hods.controllers.AlertController.status(id: org.mongodb.scala.bson.ObjectId)

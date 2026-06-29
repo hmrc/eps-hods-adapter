@@ -1,0 +1,4 @@
+<!-- To debug, copy the conf logback.xml contents here -->
+<configuration>
+    <root level="OFF"/>
+</configuration>
