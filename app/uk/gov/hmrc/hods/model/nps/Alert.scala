@@ -18,13 +18,23 @@ package uk.gov.hmrc.hods.model.nps
 
 import play.api.libs.json.{ JsValue, Json, OFormat, Writes }
 
+case class AlertParameter(taxYear: String)
+
+object AlertParameter {
+  implicit val format: OFormat[AlertParameter] = Json.format[AlertParameter]
+}
+
 case class Identifier(id_type: String, value: String)
 
 object Identifier {
   implicit val format: OFormat[Identifier] = Json.format[Identifier]
 }
 
-case class NpsAlert(identifier: Identifier, hod_id: String, template_id: String)
+case class NpsAlert(identifier: Identifier,
+                    hod_id: String,
+                    template_id: String,
+                    notice_type: Option[String] = None,
+                    parameters: Option[AlertParameter] = None)
 
 object NpsAlert {
   implicit val format: OFormat[NpsAlert] = Json.format[NpsAlert]
