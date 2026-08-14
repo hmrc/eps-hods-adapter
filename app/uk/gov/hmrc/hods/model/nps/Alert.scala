@@ -30,11 +30,13 @@ object Identifier {
   implicit val format: OFormat[Identifier] = Json.format[Identifier]
 }
 
-case class NpsAlert(identifier: Identifier,
-                    hod_id: String,
-                    template_id: String,
-                    notice_type: Option[String] = None,
-                    parameters: Option[AlertParameter] = None)
+case class NpsAlert(
+  identifier: Identifier,
+  hod_id: String,
+  template_id: String,
+  notice_type: Option[String] = None,
+  parameters: Option[AlertParameter] = None
+)
 
 object NpsAlert {
   implicit val format: OFormat[NpsAlert] = Json.format[NpsAlert]

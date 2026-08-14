@@ -18,7 +18,7 @@ package model.nps
 
 import org.scalatestplus.play.PlaySpec
 import play.api.libs.json.Json
-import uk.gov.hmrc.hods.model.nps.{Alert, Identifier, NpsAlert, AlertParameter}
+import uk.gov.hmrc.hods.model.nps.{ Alert, AlertParameter, Identifier, NpsAlert }
 
 class AlertSpec extends PlaySpec {
 
@@ -66,7 +66,7 @@ class AlertSpec extends PlaySpec {
     }
 
     "throw exception for incorrect json" in new TestCase {
-      intercept[RuntimeException]{
+      intercept[RuntimeException] {
         Json.parse(invalidNpsAlertJsonString).as[NpsAlert]
       }
     }
@@ -113,24 +113,29 @@ class AlertSpec extends PlaySpec {
         |}""".stripMargin
 
     val invalidNpsAlertJsonString: String = """{
-                                      |"identifier":{"id_type":"nino", "value":"AA000003"},
-                                      |"template_id":"4"
-                                      |}""".stripMargin
+                                              |"identifier":{"id_type":"nino", "value":"AA000003"},
+                                              |"template_id":"4"
+                                              |}""".stripMargin
 
     val npsAlertOb = NpsAlert(identifier = identifierOb, hod_id = "nps", template_id = "4")
 
-    val npsAlertWithNoticeTypeAndTaxYearOb = NpsAlert(identifier = identifierOb, hod_id = "nps", template_id = "4",
-      notice_type = Some("CY_PLUS_1"), parameters = Some(alertParameterOb))
+    val npsAlertWithNoticeTypeAndTaxYearOb = NpsAlert(
+      identifier = identifierOb,
+      hod_id = "nps",
+      template_id = "4",
+      notice_type = Some("CY_PLUS_1"),
+      parameters = Some(alertParameterOb)
+    )
 
     val alertJsonString: String = """{
-                            |"alert": {
-                            |"hod_id": "nps",
-                            |"identifier":{ "id_type": "nino", "value": "AA000003" },
-                            |"parameters":{ "taxYear": "2026" },
-                            |"notice_type": "CY_PLUS_1",
-                            |"template_id": "4"
-                            |}
-                            |}""".stripMargin
+                                    |"alert": {
+                                    |"hod_id": "nps",
+                                    |"identifier":{ "id_type": "nino", "value": "AA000003" },
+                                    |"parameters":{ "taxYear": "2026" },
+                                    |"notice_type": "CY_PLUS_1",
+                                    |"template_id": "4"
+                                    |}
+                                    |}""".stripMargin
 
     val alertWithoutNoticeTypeAndTaxYearJsonString: String =
       """{
