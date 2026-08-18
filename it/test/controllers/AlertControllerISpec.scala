@@ -37,24 +37,51 @@ class AlertControllerISpec extends IntegrationSpec {
 
   "/alert" must {
 
-    "return an Accepted response for Put request" in {
+    "return an Accepted response for Put request" when {
+      "notice_type and parameters are not present in NpsAlert" in {
 
-      server.stubFor(
-        get(urlMatching(basicPersonUpdatedUrl))
-          .willReturn(
-            aResponse()
-              .withStatus(OK)
-              .withBody(s"""{"nino" : "$generatedNino"}""")
-          )
-      )
+        server.stubFor(
+          get(urlMatching(basicPersonUpdatedUrl))
+            .willReturn(
+              aResponse()
+                .withStatus(OK)
+                .withBody(s"""{"nino" : "$generatedNino"}""")
+            )
+        )
 
-      val putRequest = Json.toJson(Alert(NpsAlert(Identifier("nino", generatedNino.withoutSuffix), "nps", "0004")))
+        val putRequest = Json.toJson(Alert(NpsAlert(Identifier("nino", generatedNino.withoutSuffix), "nps", "0004")))
 
-      val request = FakeRequest(PUT, alertUrl).withBody(putRequest)
+        val request = FakeRequest(PUT, alertUrl).withBody(putRequest)
 
-      val result = route(app, request)
+        val result = route(app, request)
 
-      result.map(status) mustBe Some(ACCEPTED)
+        result.map(status) mustBe Some(ACCEPTED)
+      }
+
+      "notice_type and parameters are present in NpsAlert" in {
+
+        server.stubFor(
+          get(urlMatching(basicPersonUpdatedUrl))
+            .willReturn(
+              aResponse()
+                .withStatus(OK)
+                .withBody(s"""{"nino" : "$generatedNino"}""")
+            )
+        )
+
+        val putRequest = Json.toJson(Alert(NpsAlert(
+            identifier = Identifier("nino", generatedNino.withoutSuffix),
+            hod_id = "nps",
+            template_id = "0004",
+            notice_type = Some("CY"),
+            parameters = Some(AlertParameter("2026")))))
+
+        val request = FakeRequest(PUT, alertUrl).withBody(putRequest)
+
+        val result = route(app, request)
+
+        result.map(status) mustBe Some(ACCEPTED)
+      }
     }
 
     "return an BAD_REQUEST status response for Empty Put request" in {
