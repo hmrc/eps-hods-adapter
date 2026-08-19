@@ -115,25 +115,57 @@ class AlertControllerSpec extends BaseSpec with BeforeAndAfterEach with ScalaFut
       status(alert) mustBe INTERNAL_SERVER_ERROR
     }
 
-    "return a 400 if the body is not json" in {
-      val requestData = "identifier: nino"
-      val request = FakeRequest(
-        "PUT",
-        "/nps/person/send-test-alert",
-        FakeHeaders(
-          Seq(
-            "Content-type"         -> "application/json",
-            "ETag"                 -> "1",
-            "X-TXID"               -> "1234",
-            "Gov-Uk-Originator-Id" -> "HMRC_HODS_ADAPTER"
-          )
-        ),
-        Json.toJson(requestData)
-      )
+    "return a 400" when {
+      "body is not correct json" in {
+        val requestData = "identifier: nino"
+        val request = FakeRequest(
+          "PUT",
+          "/nps/person/send-test-alert",
+          FakeHeaders(
+            Seq(
+              "Content-type"         -> "application/json",
+              "ETag"                 -> "1",
+              "X-TXID"               -> "1234",
+              "Gov-Uk-Originator-Id" -> "HMRC_HODS_ADAPTER"
+            )
+          ),
+          Json.toJson(requestData)
+        )
 
-      val alert = sut.putAlert.apply(request)
+        val alert = sut.putAlert.apply(request)
 
-      status(alert) mustBe BAD_REQUEST
+        status(alert) mustBe BAD_REQUEST
+      }
+
+      "json has invalid value of NoticeType" in {
+        val alertJsonString =
+          """{"alert":{
+            |"identifier":{"id_type":"nino","value":"XW446889"},
+            |"hod_id":"nps","template_id":"0004",
+            |"notice_type":"cy_plus"
+            |}
+            |}""".stripMargin
+
+        val requestData = Json.toJson(alertJsonString)
+
+        val request = FakeRequest(
+          "PUT",
+          "/nps/person/send-test-alert",
+          FakeHeaders(
+            Seq(
+              "Content-type"         -> "application/json",
+              "ETag"                 -> "1",
+              "X-TXID"               -> "1234",
+              "Gov-Uk-Originator-Id" -> "HMRC_HODS_ADAPTER"
+            )
+          ),
+          requestData
+        )
+
+        val result = sut.putAlert.apply(request)
+
+        status(result) mustBe BAD_REQUEST
+      }
     }
   }
 

@@ -17,8 +17,10 @@
 package model.nps
 
 import org.scalatestplus.play.PlaySpec
-import play.api.libs.json.Json
+import play.api.libs.json.{ JsNumber, JsResultException, JsString, Json }
 import uk.gov.hmrc.hods.model.nps.{ Alert, AlertParameter, Identifier, NpsAlert }
+import uk.gov.hmrc.hods.model.nps.NoticeType
+import uk.gov.hmrc.hods.model.nps.NoticeType.{ CY, CY_PLUS_1 }
 
 class AlertSpec extends PlaySpec {
 
@@ -58,11 +60,49 @@ class AlertSpec extends PlaySpec {
     }
   }
 
+  "NoticeType" should {
+    import NoticeType.format
+
+    "read the correct enum value" in {
+      JsString("cy").as[NoticeType] mustBe CY
+      JsString("cy_plus_1").as[NoticeType] mustBe CY_PLUS_1
+      JsString("CY").as[NoticeType] mustBe CY
+      JsString("CY_PLUS_1").as[NoticeType] mustBe CY_PLUS_1
+    }
+
+    "throw JsError for invalid string value" in {
+      intercept[JsResultException] {
+        JsString("cy2").as[NoticeType]
+      }.errors.head._2.head.message mustBe "Unknown NoticeType: cy2"
+
+      intercept[JsResultException] {
+        JsString("UNKNOWN").as[NoticeType]
+      }.errors.head._2.head.message mustBe "Unknown NoticeType: UNKNOWN"
+    }
+
+    "throw JsError for value other than String" in {
+      intercept[JsResultException] {
+        JsNumber(BigDecimal(5.0)).as[NoticeType]
+      }.errors.head._2.head.message mustBe "NoticeType must be a string"
+    }
+
+    "write the correct value" in {
+      Json.toJson(CY) mustBe JsString("cy")
+      Json.toJson(CY_PLUS_1) mustBe JsString("cy_plus_1")
+    }
+  }
+
   "NpsAlert.format" should {
     import NpsAlert.format
 
     "read the json correctly" in new TestCase {
       Json.parse(npsAlertJsonString).as[NpsAlert] mustBe npsAlertOb
+    }
+
+    "throw exception for invalid notice_type" in new TestCase {
+      intercept[RuntimeException] {
+        Json.parse(npsAlertWithInvalidNoticeTypeJsonString).as[NpsAlert]
+      }
     }
 
     "throw exception for incorrect json" in new TestCase {
@@ -117,13 +157,20 @@ class AlertSpec extends PlaySpec {
                                               |"template_id":"4"
                                               |}""".stripMargin
 
+    val npsAlertWithInvalidNoticeTypeJsonString: String = """{
+                                                            |"identifier":{"id_type":"nino", "value":"AA000003"},
+                                                            |"template_id":"4",
+                                                            |"hod_id": "nps",
+                                                            |"notice_type": "UNKNOWN"
+                                                            |}""".stripMargin
+
     val npsAlertOb = NpsAlert(identifier = identifierOb, hod_id = "nps", template_id = "4")
 
     val npsAlertWithNoticeTypeAndTaxYearOb = NpsAlert(
       identifier = identifierOb,
       hod_id = "nps",
       template_id = "4",
-      notice_type = Some("CY_PLUS_1"),
+      notice_type = Some(CY_PLUS_1),
       parameters = Some(alertParameterOb)
     )
 
@@ -132,7 +179,7 @@ class AlertSpec extends PlaySpec {
                                     |"hod_id": "nps",
                                     |"identifier":{ "id_type": "nino", "value": "AA000003" },
                                     |"parameters":{ "taxYear": "2026" },
-                                    |"notice_type": "CY_PLUS_1",
+                                    |"notice_type": "cy_plus_1",
                                     |"template_id": "4"
                                     |}
                                     |}""".stripMargin
