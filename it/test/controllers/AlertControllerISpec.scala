@@ -26,6 +26,7 @@ import play.api.test.Helpers.*
 import uk.gov.hmrc.hods.model.nps.*
 import uk.gov.hmrc.mongo.workitem.ProcessingStatus.ToDo
 import utils.IntegrationSpec
+import NoticeType.CY
 
 import java.time.{ LocalDateTime, ZoneOffset }
 
@@ -86,7 +87,7 @@ class AlertControllerISpec extends IntegrationSpec {
               identifier = Identifier("nino", generatedNino.withoutSuffix),
               hod_id = "nps",
               template_id = "0004",
-              notice_type = Some("CY"),
+              notice_type = Some(CY),
               parameters = Some(AlertParameter("2026"))
             )
           )
