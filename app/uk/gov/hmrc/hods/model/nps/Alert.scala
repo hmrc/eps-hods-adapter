@@ -16,7 +16,13 @@
 
 package uk.gov.hmrc.hods.model.nps
 
-import play.api.libs.json.{ JsValue, Json, OFormat, Writes }
+import play.api.libs.json.{ Format, JsError, JsString, JsSuccess, JsValue, Json, OFormat, Reads, Writes }
+
+case class AlertParameter(taxYear: String)
+
+object AlertParameter {
+  implicit val format: OFormat[AlertParameter] = Json.format[AlertParameter]
+}
 
 case class Identifier(id_type: String, value: String)
 
@@ -24,7 +30,34 @@ object Identifier {
   implicit val format: OFormat[Identifier] = Json.format[Identifier]
 }
 
-case class NpsAlert(identifier: Identifier, hod_id: String, template_id: String)
+enum NoticeType {
+  case CY, CY_PLUS_1
+  private def entryName: String = this.toString.toLowerCase
+}
+
+object NoticeType {
+
+  implicit val reads: Reads[NoticeType] = Reads {
+    case JsString(value) =>
+      values.find(_.entryName.equalsIgnoreCase(value)) match {
+        case Some(status) => JsSuccess(status)
+        case _            => JsError(s"Unknown NoticeType: $value")
+      }
+
+    case _ => JsError("NoticeType must be a string")
+  }
+
+  implicit val writes: Writes[NoticeType] = Writes(status => JsString(status.entryName))
+  implicit val format: Format[NoticeType] = Format(reads, writes)
+}
+
+case class NpsAlert(
+  identifier: Identifier,
+  hod_id: String,
+  template_id: String,
+  notice_type: Option[NoticeType] = None,
+  parameters: Option[AlertParameter] = None
+)
 
 object NpsAlert {
   implicit val format: OFormat[NpsAlert] = Json.format[NpsAlert]

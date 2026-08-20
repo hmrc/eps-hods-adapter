@@ -1,6 +1,17 @@
 /*
  * Copyright 2026 HM Revenue & Customs
  *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package uk.gov.hmrc.hods.controllers
@@ -104,25 +115,57 @@ class AlertControllerSpec extends BaseSpec with BeforeAndAfterEach with ScalaFut
       status(alert) mustBe INTERNAL_SERVER_ERROR
     }
 
-    "return a 400 if the body is not json" in {
-      val requestData = "identifier: nino"
-      val request = FakeRequest(
-        "PUT",
-        "/nps/person/send-test-alert",
-        FakeHeaders(
-          Seq(
-            "Content-type"         -> "application/json",
-            "ETag"                 -> "1",
-            "X-TXID"               -> "1234",
-            "Gov-Uk-Originator-Id" -> "HMRC_HODS_ADAPTER"
-          )
-        ),
-        Json.toJson(requestData)
-      )
+    "return a 400" when {
+      "body is not correct json" in {
+        val requestData = "identifier: nino"
+        val request = FakeRequest(
+          "PUT",
+          "/nps/person/send-test-alert",
+          FakeHeaders(
+            Seq(
+              "Content-type"         -> "application/json",
+              "ETag"                 -> "1",
+              "X-TXID"               -> "1234",
+              "Gov-Uk-Originator-Id" -> "HMRC_HODS_ADAPTER"
+            )
+          ),
+          Json.toJson(requestData)
+        )
 
-      val alert = sut.putAlert.apply(request)
+        val alert = sut.putAlert.apply(request)
 
-      status(alert) mustBe BAD_REQUEST
+        status(alert) mustBe BAD_REQUEST
+      }
+
+      "json has invalid value of NoticeType" in {
+        val alertJsonString =
+          """{"alert":{
+            |"identifier":{"id_type":"nino","value":"XW446889"},
+            |"hod_id":"nps","template_id":"0004",
+            |"notice_type":"cy_plus"
+            |}
+            |}""".stripMargin
+
+        val requestData = Json.toJson(alertJsonString)
+
+        val request = FakeRequest(
+          "PUT",
+          "/nps/person/send-test-alert",
+          FakeHeaders(
+            Seq(
+              "Content-type"         -> "application/json",
+              "ETag"                 -> "1",
+              "X-TXID"               -> "1234",
+              "Gov-Uk-Originator-Id" -> "HMRC_HODS_ADAPTER"
+            )
+          ),
+          requestData
+        )
+
+        val result = sut.putAlert.apply(request)
+
+        status(result) mustBe BAD_REQUEST
+      }
     }
   }
 

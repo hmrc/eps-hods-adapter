@@ -1,6 +1,17 @@
 /*
  * Copyright 2026 HM Revenue & Customs
  *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package controllers
@@ -15,6 +26,7 @@ import play.api.test.Helpers.*
 import uk.gov.hmrc.hods.model.nps.*
 import uk.gov.hmrc.mongo.workitem.ProcessingStatus.ToDo
 import utils.IntegrationSpec
+import NoticeType.CY
 
 import java.time.{ LocalDateTime, ZoneOffset }
 
@@ -37,24 +49,56 @@ class AlertControllerISpec extends IntegrationSpec {
 
   "/alert" must {
 
-    "return an Accepted response for Put request" in {
+    "return an Accepted response for PUT request" when {
+      "notice_type and parameters are not present in NpsAlert" in {
 
-      server.stubFor(
-        get(urlMatching(basicPersonUpdatedUrl))
-          .willReturn(
-            aResponse()
-              .withStatus(OK)
-              .withBody(s"""{"nino" : "$generatedNino"}""")
+        server.stubFor(
+          get(urlMatching(basicPersonUpdatedUrl))
+            .willReturn(
+              aResponse()
+                .withStatus(OK)
+                .withBody(s"""{"nino" : "$generatedNino"}""")
+            )
+        )
+
+        val putRequest = Json.toJson(Alert(NpsAlert(Identifier("nino", generatedNino.withoutSuffix), "nps", "0004")))
+
+        val request = FakeRequest(PUT, alertUrl).withBody(putRequest)
+
+        val result = route(app, request)
+
+        result.map(status) mustBe Some(ACCEPTED)
+      }
+
+      "notice_type and parameters are present in NpsAlert" in {
+
+        server.stubFor(
+          get(urlMatching(basicPersonUpdatedUrl))
+            .willReturn(
+              aResponse()
+                .withStatus(OK)
+                .withBody(s"""{"nino" : "$generatedNino"}""")
+            )
+        )
+
+        val putRequest = Json.toJson(
+          Alert(
+            NpsAlert(
+              identifier = Identifier("nino", generatedNino.withoutSuffix),
+              hod_id = "nps",
+              template_id = "0004",
+              notice_type = Some(CY),
+              parameters = Some(AlertParameter("2026"))
+            )
           )
-      )
+        )
 
-      val putRequest = Json.toJson(Alert(NpsAlert(Identifier("nino", generatedNino.withoutSuffix), "nps", "0004")))
+        val request = FakeRequest(PUT, alertUrl).withBody(putRequest)
 
-      val request = FakeRequest(PUT, alertUrl).withBody(putRequest)
+        val result = route(app, request)
 
-      val result = route(app, request)
-
-      result.map(status) mustBe Some(ACCEPTED)
+        result.map(status) mustBe Some(ACCEPTED)
+      }
     }
 
     "return an BAD_REQUEST status response for Empty Put request" in {
@@ -70,7 +114,7 @@ class AlertControllerISpec extends IntegrationSpec {
 
     }
 
-    "return an Accepted response for Post request" in {
+    "return an Accepted response for POST request" in {
 
       server.stubFor(
         get(urlMatching(basicPersonUpdatedUrl))
