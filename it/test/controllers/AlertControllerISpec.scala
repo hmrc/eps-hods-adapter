@@ -130,7 +130,7 @@ class AlertControllerISpec extends IntegrationSpec {
       }
     }
 
-    "return BAD_REQUEST" when {
+    "return UNPROCESSABLE_ENTITY" when {
 
       "notice_type has a value of cy_plus_1 but taxYear parameter is not present in the payload" in {
         val putRequest = Json.toJson(
@@ -141,7 +141,7 @@ class AlertControllerISpec extends IntegrationSpec {
 
         val result = route(app, request)
 
-        result.map(status) mustBe Some(BAD_REQUEST)
+        result.map(status) mustBe Some(UNPROCESSABLE_ENTITY)
       }
     }
 

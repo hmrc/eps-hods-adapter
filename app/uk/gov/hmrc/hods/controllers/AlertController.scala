@@ -46,7 +46,11 @@ class AlertController @Inject() (
   def putAlert: Action[JsValue] = Action.async(parse.json) { implicit request =>
     withJsonBody[Alert] { alert =>
       if (isPayloadInvalidForCYPlus1NoticeType(alert.alert)) {
-        Future(BadRequest("Request could not be processed as taxYear parameter is missing for notice_type CY_PLUS_1"))
+        Future(
+          UnprocessableEntity(
+            "Request could not be processed as taxYear parameter is missing for notice_type CY_PLUS_1"
+          )
+        )
       } else {
         withMetricsTimer("putalert") { timer =>
           // NPS sends the alert with Nino having no suffix.
