@@ -26,7 +26,7 @@ import play.api.test.Helpers.*
 import uk.gov.hmrc.hods.model.nps.*
 import uk.gov.hmrc.mongo.workitem.ProcessingStatus.ToDo
 import utils.IntegrationSpec
-import NoticeType.CY
+import NoticeType.{ CY, CY_PLUS_1 }
 
 import java.time.{ LocalDateTime, ZoneOffset }
 
@@ -98,6 +98,50 @@ class AlertControllerISpec extends IntegrationSpec {
         val result = route(app, request)
 
         result.map(status) mustBe Some(ACCEPTED)
+      }
+
+      "notice_type is CY and parameters is not present in NpsAlert" in {
+
+        server.stubFor(
+          get(urlMatching(basicPersonUpdatedUrl))
+            .willReturn(
+              aResponse()
+                .withStatus(OK)
+                .withBody(s"""{"nino" : "$generatedNino"}""")
+            )
+        )
+
+        val putRequest = Json.toJson(
+          Alert(
+            NpsAlert(
+              identifier = Identifier("nino", generatedNino.withoutSuffix),
+              hod_id = "nps",
+              template_id = "0004",
+              notice_type = Some(CY)
+            )
+          )
+        )
+
+        val request = FakeRequest(PUT, alertUrl).withBody(putRequest)
+
+        val result = route(app, request)
+
+        result.map(status) mustBe Some(ACCEPTED)
+      }
+    }
+
+    "return UNPROCESSABLE_ENTITY" when {
+
+      "notice_type has a value of cy_plus_1 but taxYear parameter is not present in the payload" in {
+        val putRequest = Json.toJson(
+          Alert(NpsAlert(Identifier("nino", generatedNino.withoutSuffix), "nps", "0004", notice_type = Some(CY_PLUS_1)))
+        )
+
+        val request = FakeRequest(PUT, alertUrl).withBody(putRequest)
+
+        val result = route(app, request)
+
+        result.map(status) mustBe Some(UNPROCESSABLE_ENTITY)
       }
     }
 

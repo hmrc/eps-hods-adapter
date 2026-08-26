@@ -21,7 +21,8 @@ import play.api.Logging
 import play.api.libs.json.{ JsValue, Json }
 import play.api.mvc.{ Action, AnyContent, ControllerComponents }
 import uk.gov.hmrc.hods.metrics.HasMetrics
-import uk.gov.hmrc.hods.model.nps.{ Alert, ChangeStatus }
+import uk.gov.hmrc.hods.model.nps.NoticeType.CY_PLUS_1
+import uk.gov.hmrc.hods.model.nps.{ Alert, ChangeStatus, NpsAlert }
 import uk.gov.hmrc.hods.repository.AlertWorkItemRepository
 import uk.gov.hmrc.hods.util.AuditLog
 import uk.gov.hmrc.mongo.workitem.ProcessingStatus.ToDo
@@ -44,18 +45,27 @@ class AlertController @Inject() (
 
   def putAlert: Action[JsValue] = Action.async(parse.json) { implicit request =>
     withJsonBody[Alert] { alert =>
-      withMetricsTimer("putalert") { timer =>
-        // NPS sends the alert with Nino having no suffix.
-        alertWorkItemRepository.alertNotification(alert).map { workItem =>
-          auditLog.createAuditEvent(workItem.id.toString, workItem.item.alert, "created")
-          timer.completeTimerAndIncrementSuccessCounter()
-          Accepted
-        }
-      }.recover { case NonFatal(e) =>
-        logger.warn(
-          s"Problem occurred while put Alert with NINO ${alert.alert.identifier.value}, error: ${e.getMessage}"
+      if (isPayloadInvalidForCYPlus1NoticeType(alert.alert)) {
+        Future(
+          UnprocessableEntity(
+            "Request could not be processed as taxYear parameter is missing for notice_type CY_PLUS_1"
+          )
         )
-        InternalServerError(e.getMessage)
+      } else {
+        withMetricsTimer("putalert") { timer =>
+          // NPS sends the alert with Nino having no suffix.
+
+          alertWorkItemRepository.alertNotification(alert).map { workItem =>
+            auditLog.createAuditEvent(workItem.id.toString, workItem.item.alert, "created")
+            timer.completeTimerAndIncrementSuccessCounter()
+            Accepted
+          }
+        }.recover { case NonFatal(e) =>
+          logger.warn(
+            s"Problem occurred while put Alert with NINO ${alert.alert.identifier.value}, error: ${e.getMessage}"
+          )
+          InternalServerError(e.getMessage)
+        }
       }
     }
   }
@@ -85,4 +95,7 @@ class AlertController @Inject() (
       case None    => NotFound
     }
   }
+
+  private def isPayloadInvalidForCYPlus1NoticeType(npsAlert: NpsAlert): Boolean =
+    npsAlert.notice_type.contains(CY_PLUS_1) && npsAlert.parameters.isEmpty
 }
