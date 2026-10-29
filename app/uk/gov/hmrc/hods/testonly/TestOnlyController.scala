@@ -30,6 +30,8 @@ class TestOnlyController @Inject() (
     extends BackendController(cc) {
 
   def deleteAlerts(): Action[AnyContent] = Action.async { implicit request =>
-    alertWorkItemRepository.deleteAlerts().map(result => Ok(s"Alerts Deleted: ${result.getDeletedCount}"))
+    alertWorkItemRepository.deleteAlerts().map { result =>
+      if (result.wasAcknowledged()) Ok(s"Alerts Deleted: ${result.getDeletedCount}") else NotModified
+    }
   }
 }
