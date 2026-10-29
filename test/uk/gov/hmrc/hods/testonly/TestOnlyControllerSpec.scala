@@ -40,27 +40,17 @@ class TestOnlyControllerSpec extends BaseSpec with BeforeAndAfterEach {
 
   "delete alerts" should {
     "return a success message with deleted count" in {
-      val request = FakeRequest(
-        "DELETE",
-        "/test-only/delete/printSuppressionAlerts "
-      )
-
       when(mockRepository.deleteAlerts()).thenReturn(Future.successful(DeleteResult.acknowledged(2)))
 
-      val alert = sut.deleteAlerts().apply(request)
+      val alert = sut.deleteAlerts().apply(FakeRequest())
       status(alert) mustBe OK
       contentAsString(alert) mustBe "Alerts Deleted: 2"
     }
 
     "return not modified when alerts not deleted" in {
-      val request = FakeRequest(
-        "DELETE",
-        "/test-only/delete/printSuppressionAlerts "
-      )
-
       when(mockRepository.deleteAlerts()).thenReturn(Future.successful(DeleteResult.unacknowledged))
 
-      val alert = sut.deleteAlerts().apply(request)
+      val alert = sut.deleteAlerts().apply(FakeRequest())
       status(alert) mustBe NOT_MODIFIED
     }
   }
