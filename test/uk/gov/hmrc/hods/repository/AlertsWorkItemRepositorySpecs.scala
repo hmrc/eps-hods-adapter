@@ -100,6 +100,13 @@ class AlertsWorkItemRepositorySpecs
 
       newAlert.get.status mustBe ToDo
     }
+
+    "delete all alert items" in new Setup {
+      await(alertWorkItemRepository.alertNotification(Alert(NpsAlert(Identifier("nino1", nino.nino), "nps", "0004"))))
+      await(alertWorkItemRepository.alertNotification(Alert(NpsAlert(Identifier("nino2", nino.nino), "nps", "0005"))))
+      val deleteItem = alertWorkItemRepository.deleteAlerts().futureValue
+      deleteItem.getDeletedCount mustBe 2
+    }
   }
 
   "invalid alerts json" should {

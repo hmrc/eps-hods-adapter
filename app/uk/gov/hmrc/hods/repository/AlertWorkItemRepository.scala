@@ -26,6 +26,7 @@ import uk.gov.hmrc.mongo.workitem.ProcessingStatus.ToDo
 import uk.gov.hmrc.mongo.workitem.{ ProcessingStatus, WorkItem, WorkItemFields, WorkItemRepository }
 import org.mongodb.scala.documentToUntypedDocument
 import org.mongodb.scala.model.*
+import org.mongodb.scala.result.DeleteResult
 
 import java.time
 import java.time.{ Instant, ZoneOffset }
@@ -113,4 +114,9 @@ class AlertWorkItemRepository @Inject() (appConfig: AppConfig, mongo: MongoCompo
         ).toMap
       )
   }
+
+  def deleteAlerts(): Future[DeleteResult] =
+    collection
+      .deleteMany(Filters.empty())
+      .toFuture()
 }
