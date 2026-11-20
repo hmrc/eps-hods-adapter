@@ -26,7 +26,7 @@ import play.api.Configuration
 import play.api.libs.json.{ JsObject, JsString }
 import play.api.mvc.{ Headers, RequestHeader }
 import play.api.test.FakeRequest
-import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.{ Authorization, HeaderCarrier }
 import uk.gov.hmrc.http.hooks.Data
 import uk.gov.hmrc.play.audit.http.connector.AuditConnector
 import uk.gov.hmrc.play.bootstrap.config.{ ControllerConfig, ControllerConfigs, DefaultHttpAuditEvent }
@@ -35,7 +35,7 @@ import uk.gov.hmrc.play.bootstrap.filters.Details
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class AuditFilterSpec extends PlaySpec with ScalaFutures with MockitoSugar {
-  implicit val hc: HeaderCarrier = HeaderCarrier()
+  implicit val hc: HeaderCarrier = HeaderCarrier(authorization = Some(Authorization("HC-Authorization")))
   val configuration: Configuration = Configuration(
     "microservice.services.customs-data-store.host" -> "host",
     "bootstrap.auditing.maxBodyLength"              -> 32665
@@ -57,8 +57,13 @@ class AuditFilterSpec extends PlaySpec with ScalaFutures with MockitoSugar {
     }
 
   "AuditFilter" must {
-    "extendedDataEvent should include correlationId and requestBody" in {
-      val headers = Headers("requestBody" -> "test-body", "CorrelationId" -> "test-correlationId").headers
+    "extendedDataEvent should include correlationId and requestBody nullifying authorization in the request and header carrier" in {
+      val headers =
+        Headers(
+          "requestBody"   -> "test-body",
+          "CorrelationId" -> "test-correlationId",
+          "Authorization" -> "Header Authorization Value"
+        ).headers
       val requestDetails: JsObject = JsObject(
         headers.map { case (key, value) => key -> JsString(value) }
       )
@@ -71,12 +76,21 @@ class AuditFilterSpec extends PlaySpec with ScalaFutures with MockitoSugar {
       )
       val details = event.detail.as[Map[String, String]]
 
-      details.get("CorrelationId") mustBe Some("test-correlationId")
-      details.get("requestBody") mustBe Some("test-body")
+      details mustBe Map(
+        "method"          -> "GET",
+        "CorrelationId"   -> "test-correlationId",
+        "deviceID"        -> "-",
+        "referrer"        -> "-",
+        "Authorization"   -> "-",
+        "input"           -> "Request to /test",
+        "userAgentString" -> "-",
+        "requestBody"     -> "test-body",
+        "ipAddress"       -> "-"
+      )
     }
 
     "buildRequestDetails" must {
-      def testExtendedDataEvent(headers: Headers, expectedCorrelationId: String)(implicit
+      def testBuildRequestDetails(headers: Headers, expectedCorrelationId: String)(implicit
         position: Position
       ) = {
         val request = FakeRequest(
@@ -90,20 +104,20 @@ class AuditFilterSpec extends PlaySpec with ScalaFutures with MockitoSugar {
           auditFilter.getBuildRequestDetails(request, Data("test-body", isTruncated = false, isRedacted = false))
         val details = requestDetails.details.as[Map[String, String]]
 
-        details.get("CorrelationId") mustBe Some(expectedCorrelationId)
-        details.get("requestBody") mustBe Some("test-body")
+        details mustBe Map("requestBody" -> "test-body", "CorrelationId" -> expectedCorrelationId)
       }
 
       "generate details with passed correlationId and requestBody from the given request header" in {
-        val headers = Headers("requestBody" -> "test-body", "CorrelationId" -> "test-correlationId")
+        val headers =
+          Headers("requestBody" -> "test-body", "CorrelationId" -> "test-correlationId", "Authorization" -> "ss")
 
-        testExtendedDataEvent(headers, "test-correlationId")
+        testBuildRequestDetails(headers, "test-correlationId")
       }
 
       "generate details with a generated correlationId when not passed and requestBody from the given request header" in {
-        val headers = Headers("requestBody" -> "test-body")
+        val headers = Headers("requestBody" -> "test-body", "Authorization" -> "ss")
 
-        testExtendedDataEvent(headers, "-")
+        testBuildRequestDetails(headers, "-")
       }
 
     }

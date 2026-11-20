@@ -61,5 +61,12 @@ class AuditFilter @Inject() (
     truncationLog: TruncationLog,
     redactionLog: RedactionLog
   )(implicit hc: HeaderCarrier): ExtendedDataEvent =
-    super.extendedDataEvent(eventType, transactionName, request, detail, truncationLog, redactionLog)
+    super.extendedDataEvent(
+      eventType,
+      transactionName,
+      request,
+      detail,
+      truncationLog,
+      redactionLog
+    )(hc.copy(authorization = None))
 }
