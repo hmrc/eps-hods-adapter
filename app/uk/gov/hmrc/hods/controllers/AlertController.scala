@@ -45,28 +45,34 @@ class AlertController @Inject() (
 
   def putAlert: Action[JsValue] = Action.async(parse.json) { implicit request =>
     withJsonBody[Alert] { alert =>
-      if (isPayloadInvalidForCYPlus1NoticeType(alert.alert)) {
-        Future(
-          UnprocessableEntity(
-            "Request could not be processed as taxYear parameter is missing for notice_type CY_PLUS_1"
-          )
-        )
-      } else {
-        withMetricsTimer("putalert") { timer =>
-          // NPS sends the alert with Nino having no suffix.
-
-          alertWorkItemRepository.alertNotification(alert).map { workItem =>
-            auditLog.createAuditEvent(workItem.id.toString, workItem.item.alert, "created")
-            timer.completeTimerAndIncrementSuccessCounter()
-            Accepted
+      validateAlert(alert.alert) match {
+        case Some(error) =>
+          Future.successful(UnprocessableEntity(error))
+        case None =>
+          withMetricsTimer("putalert") { timer =>
+            alertWorkItemRepository.alertNotification(alert).map { workItem =>
+              auditLog.createAuditEvent(workItem.id.toString, workItem.item.alert, "created")
+              timer.completeTimerAndIncrementSuccessCounter()
+              Accepted
+            }
+          }.recover { case NonFatal(e) =>
+            logger.warn(
+              s"Problem occurred while put Alert with NINO ${alert.alert.identifier.value}, error: ${e.getMessage}"
+            )
+            InternalServerError(e.getMessage)
           }
-        }.recover { case NonFatal(e) =>
-          logger.warn(
-            s"Problem occurred while put Alert with NINO ${alert.alert.identifier.value}, error: ${e.getMessage}"
-          )
-          InternalServerError(e.getMessage)
-        }
       }
+    }
+  }
+
+  private def validateAlert(npsAlert: NpsAlert): Option[Metric] = {
+    val taxYearPattern = "^[0-9]{4}$"
+    if (npsAlert.notice_type.contains(CY_PLUS_1) && npsAlert.parameters.isEmpty) {
+      Some("Request could not be processed as taxYear parameter is missing for notice_type CY_PLUS_1")
+    } else if (npsAlert.parameters.exists(!_.taxYear.matches(taxYearPattern))) {
+      Some("Request could not be processed as taxYear must be a four-digit year")
+    } else {
+      None
     }
   }
 
@@ -95,7 +101,4 @@ class AlertController @Inject() (
       case None    => NotFound
     }
   }
-
-  private def isPayloadInvalidForCYPlus1NoticeType(npsAlert: NpsAlert): Boolean =
-    npsAlert.notice_type.contains(CY_PLUS_1) && npsAlert.parameters.isEmpty
 }

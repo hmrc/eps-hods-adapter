@@ -19,11 +19,11 @@ package uk.gov.hmrc.hods.controllers
 import org.mockito.ArgumentMatchers.*
 import org.mockito.Mockito.*
 import org.mongodb.scala.bson.ObjectId
+import org.scalactic.source.Position
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.ScalaFutures
 import play.api.libs.json.*
-import play.api.mvc.Result
 import play.api.test.Helpers.*
 import play.api.test.{ FakeHeaders, FakeRequest }
 import uk.gov.hmrc.hods.model.nps.*
@@ -65,33 +65,156 @@ class AlertControllerSpec extends BaseSpec with BeforeAndAfterEach with ScalaFut
       cc
     )
 
-  "receiving an alert from nps" should {
-    "return a 202 and success message if the body is correct" in {
-      val alert1 =
-        Alert(NpsAlert(Identifier("nino", nino.withoutSuffix), "nps", "0004"))
-      val alerts = alert1
-      val requestData = Json.toJson(alerts)
-      val request = FakeRequest(
-        "PUT",
-        "/nps/person/alert",
-        FakeHeaders(
-          scala.Seq(
-            "Content-type" -> "application/json"
-          )
-        ),
-        requestData
-      )
-      when(mockAuditConnector.sendEvent(any[DataEvent])(any[HeaderCarrier], any[ExecutionContext]))
-        .thenReturn(Future.successful(AuditResult.Success))
-      when(mockRepository.alertNotification(any[Alert], any()))
-        .thenReturn(Future.successful(workItem))
-      val alert: Result = sut.putAlert(request).futureValue
-      alert.header.status mustBe ACCEPTED
+  "putAlert - receiving an alert from nps" should {
 
-      // NOTE: ACCEPTED state is returned whilst work still continues, i.e. sendEvent does not happen synchronously
-      eventually(timeout(2.seconds)) {
-        verify(mockAuditConnector).sendEvent(any[DataEvent])(any[HeaderCarrier], any[ExecutionContext])
-        succeed
+    "return 202 for a success" when {
+      def testSuccess(npsAlert: NpsAlert)(implicit position: Position) = {
+        val requestData = Json.toJson(Alert(npsAlert))
+        val request = FakeRequest(
+          "PUT",
+          "/nps/person/alert",
+          FakeHeaders(
+            scala.Seq(
+              "Content-type" -> "application/json"
+            )
+          ),
+          requestData
+        )
+        when(mockAuditConnector.sendEvent(any[DataEvent])(any[HeaderCarrier], any[ExecutionContext]))
+          .thenReturn(Future.successful(AuditResult.Success))
+        when(mockRepository.alertNotification(any[Alert], any()))
+          .thenReturn(Future.successful(workItem))
+
+        val eventualResult = sut.putAlert(request)
+
+        status(eventualResult) mustBe ACCEPTED
+        contentAsString(eventualResult) mustBe ""
+
+        // NOTE: ACCEPTED state is returned whilst work still continues, i.e. sendEvent does not happen synchronously
+        eventually(timeout(2.seconds)) {
+          verify(mockAuditConnector).sendEvent(any[DataEvent])(any[HeaderCarrier], any[ExecutionContext])
+          succeed
+        }
+      }
+
+      "there is no notice_type and no tax year exists" in {
+        testSuccess(NpsAlert(Identifier("nino", nino.withoutSuffix), "nps", "0004", notice_type = None))
+      }
+
+      "the notice_type is not CY_PLUS_1 and no tax year" in {
+        testSuccess(NpsAlert(Identifier("nino", nino.withoutSuffix), "nps", "0004", notice_type = Some(NoticeType.CY)))
+      }
+
+      "there is no notice_type and a valid tax year" in {
+        testSuccess(
+          NpsAlert(
+            Identifier("nino", nino.withoutSuffix),
+            "nps",
+            "0004",
+            notice_type = None,
+            parameters = Some(AlertParameter("1111"))
+          )
+        )
+      }
+
+      "the notice_type is CY_PLUS_1 and the tax year is in the correct YYYY format" in {
+        testSuccess(
+          NpsAlert(
+            Identifier("nino", nino.withoutSuffix),
+            "nps",
+            "0004",
+            notice_type = Some(NoticeType.CY_PLUS_1),
+            parameters = Some(AlertParameter("1111"))
+          )
+        )
+      }
+
+      "the notice_type is not CY_PLUS_1 and the tax year is in the correct YYYY format" in {
+        testSuccess(
+          NpsAlert(
+            Identifier("nino", nino.withoutSuffix),
+            "nps",
+            "0004",
+            notice_type = Some(NoticeType.CY),
+            parameters = Some(AlertParameter("1111"))
+          )
+        )
+      }
+
+    }
+
+    "return a 422" when {
+
+      "the notice type combination" when {
+
+        def testInvalidNoticeTypeCombination(npsAlert: NpsAlert, errorMessage: String)(implicit position: Position) = {
+          val alerts = Alert(npsAlert)
+          val requestData = Json.toJson(alerts)
+          val request = FakeRequest(
+            "PUT",
+            "/nps/person/alert",
+            FakeHeaders(
+              scala.Seq(
+                "Content-type" -> "application/json"
+              )
+            ),
+            requestData
+          )
+
+          val result = sut.putAlert.apply(request)
+          status(result) mustBe UNPROCESSABLE_ENTITY
+          contentAsString(result) mustBe errorMessage
+
+        }
+
+        val invalidDateFormatMessage = "Request could not be processed as taxYear must be a four-digit year"
+
+        "the noticeType is CY_PLUS_1 and there is no date" in {
+          testInvalidNoticeTypeCombination(
+            NpsAlert(Identifier("nino", nino.withoutSuffix), "nps", "0004", notice_type = Some(NoticeType.CY_PLUS_1)),
+            "Request could not be processed as taxYear parameter is missing for notice_type CY_PLUS_1"
+          )
+        }
+
+        "the noticeType is CY_PLUS_1 and there is a date in the wrong format" in {
+          testInvalidNoticeTypeCombination(
+            NpsAlert(
+              Identifier("nino", nino.withoutSuffix),
+              "nps",
+              "0004",
+              notice_type = Some(NoticeType.CY_PLUS_1),
+              parameters = Some(AlertParameter("111"))
+            ),
+            invalidDateFormatMessage
+          )
+        }
+
+        "the noticeType exists and there is a date in the wrong format" in {
+          testInvalidNoticeTypeCombination(
+            NpsAlert(
+              Identifier("nino", nino.withoutSuffix),
+              "nps",
+              "0004",
+              notice_type = Some(NoticeType.CY),
+              parameters = Some(AlertParameter("111"))
+            ),
+            invalidDateFormatMessage
+          )
+        }
+
+        "the noticeType is None and there is a date in the wrong format" in {
+          testInvalidNoticeTypeCombination(
+            NpsAlert(
+              Identifier("nino", nino.withoutSuffix),
+              "nps",
+              "0004",
+              notice_type = None,
+              parameters = Some(AlertParameter("111"))
+            ),
+            invalidDateFormatMessage
+          )
+        }
+
       }
     }
 
@@ -169,7 +292,7 @@ class AlertControllerSpec extends BaseSpec with BeforeAndAfterEach with ScalaFut
     }
   }
 
-  "The api should respond" should {
+  "changeStatus - The api should respond" should {
 
     "return 403 if status is ToDo but result is forbidden for changeStatus API" in {
       val availableAt =
