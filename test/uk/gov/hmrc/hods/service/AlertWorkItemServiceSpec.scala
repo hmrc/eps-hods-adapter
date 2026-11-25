@@ -17,19 +17,19 @@
 package uk.gov.hmrc.hods.service
 
 import org.bson.types.ObjectId
-import org.mockito.ArgumentMatchers.{ any, eq as meq }
+import org.mockito.ArgumentMatchers.{any, eq as meq}
 import org.mockito.Mockito.*
-import org.scalatest.concurrent.{ PatienceConfiguration, ScalaFutures }
+import org.scalatest.concurrent.{PatienceConfiguration, ScalaFutures}
 import play.api.libs.json.JsValue
-import play.api.mvc.{ Result, Results }
+import play.api.mvc.{Result, Results}
 import play.api.test.Helpers.*
 import uk.gov.hmrc.hods.config.AppConfig
 import uk.gov.hmrc.hods.connectors.EpsMessageRendererConnector
-import uk.gov.hmrc.hods.model.nps.{ Alert, Identifier, NpsAlert }
+import uk.gov.hmrc.hods.model.nps.{Alert, Identifier, NpsAlert}
 import uk.gov.hmrc.hods.repository.AlertWorkItemRepository
-import uk.gov.hmrc.hods.util.{ AuditLog, BaseSpec }
+import uk.gov.hmrc.hods.util.{AuditLog, BaseSpec}
 import uk.gov.hmrc.http.*
-import uk.gov.hmrc.mongo.workitem.ProcessingStatus.ToDo
+import uk.gov.hmrc.mongo.workitem.ProcessingStatus.{PermanentlyFailed, ToDo}
 import uk.gov.hmrc.mongo.workitem.WorkItem
 import uk.gov.hmrc.play.audit.http.connector.AuditConnector
 import uk.gov.hmrc.play.audit.http.connector.AuditResult.Success
@@ -106,6 +106,22 @@ class AlertWorkItemServiceSpec extends BaseSpec with ScalaFutures with PatienceC
       response mustBe Results.NoContent
       verifyNoInteractions(mockEpsMrConnector)
       verifyNoInteractions(mockAuditConnector)
+    }
+
+    "return NoContent response when failed item is already retried 4 times" in {
+      given hc: HeaderCarrier = any[HeaderCarrier]
+
+      when(mockRepository.pullOutstandingItems(meq(failedBefore), meq(available)))
+        .thenReturn(Future.successful(Some(workItem.copy(failureCount = 5))))
+      when(mockAuditConnector.sendEvent(any)(any, any))
+        .thenReturn(Future.successful(Success))
+      when(mockRepository.markAs(meq(workItem.id), meq(PermanentlyFailed), any()))
+        .thenReturn(Future.successful(true))
+
+      val response: Result = await(sut.processOutstandingItem())
+
+      response mustBe Results.NoContent
+      verifyNoInteractions(mockEpsMrConnector)
     }
 
     "available before & failed before values to be evaluated when called" in {
