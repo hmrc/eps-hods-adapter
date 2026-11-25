@@ -28,7 +28,7 @@ import uk.gov.hmrc.hods.model.nps.{ Alert, AlertItemFormat }
 import uk.gov.hmrc.hods.repository.AlertWorkItemRepository
 import uk.gov.hmrc.hods.util.AuditLog
 import uk.gov.hmrc.http.{ HeaderCarrier, HttpResponse }
-import uk.gov.hmrc.mongo.workitem.ProcessingStatus.PermanentlyFailed
+import uk.gov.hmrc.mongo.workitem.ProcessingStatus.{ Failed, PermanentlyFailed }
 import uk.gov.hmrc.mongo.workitem.WorkItem
 
 import java.time.Instant
@@ -62,13 +62,13 @@ class AlertWorkItemService @Inject() (
       .pullOutstandingItems(failedBefore, availableBefore)
       .flatMap {
         case None => Future(NoContent)
-        case Some(item) if item.failureCount <= 4 =>
+        case Some(item) if item.status == Failed && item.failureCount > 4 =>
+          auditLog.createAuditEvent(item.id.toString, item.item.alert, "permanently-failed")
+          alertWorkItemRepository.markAs(item.id, PermanentlyFailed).map(_ => NoContent)
+        case Some(item) =>
           auditLog.createAuditEvent(item.id.toString, item.item.alert, "progressed")
           val jsonValue = Json.toJson(item).as[JsObject] ++ Json.obj("statusUrl" -> statusUrlFor(item))
           epsMessageRendererConnector.postNotification(jsonValue).map(handleResponse(_, item.id))
-        case Some(item) =>
-          auditLog.createAuditEvent(item.id.toString, item.item.alert, "permanently-failed")
-          alertWorkItemRepository.markAs(item.id, PermanentlyFailed).map(_ => NoContent)
       }
 
   private def handleResponse(response: HttpResponse, alertId: ObjectId) = response.status match {
